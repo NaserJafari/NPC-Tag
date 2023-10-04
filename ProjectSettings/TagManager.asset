@@ -13,8 +13,8 @@ TagManager:
   - UI
   - whatIsGround
   - whatIsWall
-  - 
-  - 
+  - whatIsLedge
+  - whatIsPlayer
   - 
   - 
   - 
