@@ -43,12 +43,14 @@ public class WallRunning : MonoBehaviour
     [Header("References")]
     public Transform orientation;
     private Movement movement;
+    private LegdeGrabbing lg;
     private Rigidbody rb;
 
     private void Start()
     {
         rb = GetComponent<Rigidbody>();
         movement = GetComponent<Movement>();
+        lg = GetComponent<LegdeGrabbing>();
     }
 
     private void Update()
@@ -156,7 +158,7 @@ public class WallRunning : MonoBehaviour
 
         // push to wall force
         if (!(wallLeft && horizontalInput > 0) && !(wallRight && horizontalInput < 0))
-            rb.AddForce(-wallNormal * 100, ForceMode.Force);
+            rb.AddForce(-wallNormal * 200, ForceMode.Force);
 
         // weaken gravity
         if (useGravity)
@@ -170,6 +172,8 @@ public class WallRunning : MonoBehaviour
 
     private void WallJump()
     {
+        if (lg.holding || lg.exitingLedge) return;
+
         // enter exiting wall state
         exitingWall = true;
         exitWallTimer = exitWallTime;

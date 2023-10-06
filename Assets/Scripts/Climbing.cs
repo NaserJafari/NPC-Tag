@@ -8,6 +8,7 @@ public class Climbing : MonoBehaviour
     public Transform orientation;
     public Rigidbody rb;
     public Movement movement;
+    public LegdeGrabbing lg;
     public LayerMask whatIsWall;
 
     [Header("Climbing")]
@@ -43,6 +44,11 @@ public class Climbing : MonoBehaviour
     public float exitWallTime;
     private float exitWallTimer;
 
+    private void Start()
+    {
+        lg = GetComponent<LegdeGrabbing>();
+    }
+
     private void Update()
     {
         WallCheck();
@@ -53,8 +59,13 @@ public class Climbing : MonoBehaviour
 
     private void StateMachine()
     {
+        if (lg.holding)
+        {
+            if (climbing) StopClimbing();
+        }
+
         //climbing
-        if (wallFront && Input.GetKey(KeyCode.W) && wallLookAngle < maxWallLookAngle && !exitingWall)
+        else if (wallFront && Input.GetKey(KeyCode.W) && wallLookAngle < maxWallLookAngle && !exitingWall)
         {
             if (!climbing && climbTimer > 0) StartClimbing();
 
@@ -114,6 +125,9 @@ public class Climbing : MonoBehaviour
 
     private void ClimbJump()
     {
+        if (movement.grounded) return;
+        if (lg.holding || lg.exitingLedge) return;
+
         exitingWall = true;
         exitWallTimer = exitWallTime;
 

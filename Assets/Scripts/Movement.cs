@@ -11,6 +11,9 @@ public class Movement : MonoBehaviour
     public float slideSpeed;
     public float wallrunSpeed;
     public float climbSpeed;
+    public float dashSpeed;
+    public float dashSpeedChangeFactor;
+    public float maxYSpeed;
 
     private float desiredMoveSpeed;
     private float lastDesiredMoveSpeed;
@@ -67,6 +70,7 @@ public class Movement : MonoBehaviour
         sprinting,
         wallrunning,
         climbing,
+        dashing,
         crouching,
         sliding,
         air
@@ -78,6 +82,7 @@ public class Movement : MonoBehaviour
     public bool climbing;
     public bool freeze;
     public bool unlimited;
+    public bool dashing;
 
     public bool restricted;
 
@@ -101,7 +106,7 @@ public class Movement : MonoBehaviour
         StateHandler();
 
         // handle drag
-        if (grounded)
+        if (state == MovementState.walking || state == MovementState.sprinting || state == MovementState.crouching)
         {
             rb.drag = groundDrag;
         }
@@ -145,9 +150,19 @@ public class Movement : MonoBehaviour
         }
     }
 
+    private bool keepMomentum;
+    private MovementState lastState;
+
     private void StateHandler()
     {
-        if (freeze)
+        if (dashing)
+        {
+            state = MovementState.dashing;
+            desiredMoveSpeed = dashSpeed;
+            speedChangeFactor = dashSpeedChangeFactor;
+        }
+
+        else if (freeze)
         {
             state = MovementState.freeze;
             rb.velocity = Vector3.zero;
@@ -180,10 +195,15 @@ public class Movement : MonoBehaviour
             state = MovementState.sliding;
 
             if (OnSlope() && rb.velocity.y < 0.1f)
+            {
                 desiredMoveSpeed = slideSpeed;
+                keepMomentum = true;
+            }
 
             else
+            {
                 desiredMoveSpeed = sprintSpeed;
+            }
         }
 
         // Mode - Crouching
@@ -211,23 +231,44 @@ public class Movement : MonoBehaviour
         else
         {
             state = MovementState.air;
+
+            if (desiredMoveSpeed < sprintSpeed)
+            {
+                desiredMoveSpeed = walkSpeed;
+            }
+
+            else
+            {
+                desiredMoveSpeed = sprintSpeed;
+            }
         }
 
-        if (!wallrunning) rb.useGravity = !OnSlope(); 
+        bool desiredMoveSpeedHasChanged = desiredMoveSpeed != lastDesiredMoveSpeed;
+        if (lastState == MovementState.dashing) keepMomentum = true;
 
-        // check if desiredMoveSpeed has changed drastically
-        if (Mathf.Abs(desiredMoveSpeed - lastDesiredMoveSpeed) > 4f && moveSpeed != 0)
+        if (desiredMoveSpeedHasChanged) 
         {
-            StopAllCoroutines();
-            StartCoroutine(SmoothlyLerpMoveSpeed());
+            if (keepMomentum)
+            {
+                StopAllCoroutines();
+                StartCoroutine(SmoothlyLerpMoveSpeed());
+            }
+
+            else
+            {
+                moveSpeed = desiredMoveSpeed;
+            }
         }
-        else
-        {
-            moveSpeed = desiredMoveSpeed;
-        }
+
+        if (!wallrunning) rb.useGravity = !OnSlope();
+
+        if (Mathf.Abs(desiredMoveSpeed - moveSpeed) < 0.1f) keepMomentum = false;
 
         lastDesiredMoveSpeed = desiredMoveSpeed;
+        lastState = state;
     }
+
+    private float speedChangeFactor;
 
     private IEnumerator SmoothlyLerpMoveSpeed()
     {
@@ -236,19 +277,13 @@ public class Movement : MonoBehaviour
         float difference = Mathf.Abs(desiredMoveSpeed - moveSpeed);
         float startValue = moveSpeed;
 
+        float boostFactor = speedChangeFactor;
+
         while (time < difference)
         {
             moveSpeed = Mathf.Lerp(startValue, desiredMoveSpeed, time / difference);
 
-            if (OnSlope())
-            {
-                float slopeAngle = Vector3.Angle(Vector3.up, slopeHit.normal);
-                float slopeAngleIncrease = 1 + (slopeAngle / 90f);
-
-                time += Time.deltaTime * speedIncreaseMultiplier * slopeIncreaseMultiplier * slopeAngleIncrease;
-            }
-            else
-                time += Time.deltaTime * speedIncreaseMultiplier;
+            time += Time.deltaTime * boostFactor;
 
             yield return null;
         }
@@ -259,6 +294,8 @@ public class Movement : MonoBehaviour
     private void MovePlayer()
     {
         if (restricted) return;
+
+        if (state == MovementState.dashing) return;
 
         // calculate movement direction
         moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
@@ -304,6 +341,11 @@ public class Movement : MonoBehaviour
                 Vector3 limitedVel = flatVel.normalized * moveSpeed;
                 rb.velocity = new Vector3(limitedVel.x, rb.velocity.y, limitedVel.z);
             }
+        }
+
+        if (maxYSpeed != 0 && rb.velocity.y > maxYSpeed)
+        {
+            rb.velocity = new Vector3(rb.velocity.x, maxYSpeed, rb.velocity.z);
         }
     }
 
